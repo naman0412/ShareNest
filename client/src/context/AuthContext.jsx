@@ -18,6 +18,7 @@ export const AuthProvider = ({ children }) => {
         .catch(() => {
           localStorage.removeItem('token');
           delete axios.defaults.headers.common['Authorization'];
+          setUser(null);
         })
         .finally(() => setLoading(false));
     } else {
@@ -25,31 +26,33 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const login = async (email, password, role) => {
+  const login = async (email, password) => {
     try {
       const res = await axios.post(`${API_URL}/auth/login`, { email, password });
       localStorage.setItem('token', res.data.token);
       axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
       setUser(res.data);
-      toast.success('Logged in successfully!');
-      return { success: true, role };
+      toast.success(`Welcome back, ${res.data.name}!`);
+      return { success: true, user: res.data };
     } catch (error) {
-      toast.error(error.response?.data?.error?.message || 'Login failed');
-      return { success: false };
+      const msg = error.response?.data?.error?.message || error.response?.data?.message || 'Login failed';
+      toast.error(msg);
+      return { success: false, error: msg };
     }
   };
 
-  const register = async (data, role) => {
+  const register = async (data) => {
     try {
       const res = await axios.post(`${API_URL}/auth/register`, data);
       localStorage.setItem('token', res.data.token);
       axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
       setUser(res.data);
-      toast.success('Registered successfully!');
-      return { success: true, role };
+      toast.success('Account created successfully! Welcome to ShareNest.');
+      return { success: true, user: res.data };
     } catch (error) {
-      toast.error(error.response?.data?.error?.message || 'Registration failed');
-      return { success: false };
+      const msg = error.response?.data?.error?.message || error.response?.data?.message || 'Registration failed';
+      toast.error(msg);
+      return { success: false, error: msg };
     }
   };
 
@@ -57,7 +60,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('token');
     delete axios.defaults.headers.common['Authorization'];
     setUser(null);
-    toast.success('Logged out');
+    toast.success('Logged out successfully');
   };
 
   return (

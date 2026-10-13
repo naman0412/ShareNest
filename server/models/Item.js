@@ -12,6 +12,7 @@ const itemSchema = new mongoose.Schema(
     feePerDay: { type: Number, required: true, min: 0 },
     depositAmount: { type: Number, required: true, min: 0 },
     area: { type: String, enum: CITIES, required: true, index: true },
+    pickupLocation: { type: String, default: '' },
     availableFrom: { type: Date, required: true },
     availableTo: { type: Date, required: true },
     isActive: { type: Boolean, default: true, index: true },

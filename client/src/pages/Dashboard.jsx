@@ -2,10 +2,9 @@ import React, { useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { API_URL, CITIES, CATEGORIES } from '../constants';
 import axios from 'axios';
-import { Package, Inbox, ShoppingBag, Plus, X } from 'lucide-react';
+import { Package, Inbox, ShoppingBag, Plus, Clock, MapPin, AlertCircle, CheckCircle, Navigation, Shield, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-const CONDITIONS = ['New', 'Like New', 'Excellent', 'Good', 'Fair'];
+import PostItemModal from '../components/PostItemModal';
 
 const Dashboard = () => {
   const { user } = useContext(AuthContext);
@@ -13,20 +12,7 @@ const Dashboard = () => {
   const [borrowRequests, setBorrowRequests] = useState([]);
   const [lenderRequests, setLenderRequests] = useState([]);
   const [myItems, setMyItems] = useState([]);
-
-  // List Item Modal state
-  const [showModal, setShowModal] = useState(false);
-  const [isSubmittingItem, setIsSubmittingItem] = useState(false);
-  const [newItem, setNewItem] = useState({
-    title: '',
-    description: '',
-    category: CATEGORIES[0] || 'Electronics',
-    condition: 'Excellent',
-    feePerDay: '',
-    depositAmount: '',
-    area: user?.area || CITIES[0] || 'Indore',
-    imageUrl: ''
-  });
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -55,166 +41,251 @@ const Dashboard = () => {
       toast.success('Status updated successfully');
       fetchData();
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'Failed to update');
+      toast.error(err.response?.data?.error?.message || 'Failed to update request');
     }
   };
 
-  const handleCreateItem = async (e) => {
-    e.preventDefault();
-    if (!newItem.title.trim() || !newItem.description.trim() || !newItem.feePerDay) {
-      toast.error('Please fill in title, description, and fee');
-      return;
+  // Helper function to calculate exact time remaining
+  const getTimeRemaining = (endDateStr, status) => {
+    if (status === 'completed') {
+      return { text: 'Rental Completed', type: 'completed' };
     }
+    if (status === 'cancelled' || status === 'declined') {
+      return { text: status.toUpperCase(), type: 'cancelled' };
+    }
+    if (!endDateStr) return null;
 
-    setIsSubmittingItem(true);
-    try {
-      const now = new Date();
-      const threeMonths = new Date();
-      threeMonths.setMonth(now.getMonth() + 3);
+    const end = new Date(endDateStr).getTime();
+    const now = Date.now();
+    const diff = end - now;
 
-      const payload = {
-        title: newItem.title.trim(),
-        description: newItem.description.trim(),
-        category: newItem.category,
-        condition: newItem.condition,
-        feePerDay: Number(newItem.feePerDay),
-        depositAmount: Number(newItem.depositAmount) || 0,
-        area: newItem.area || user.area || 'Indore',
-        availableFrom: now.toISOString(),
-        availableTo: threeMonths.toISOString(),
-        images: newItem.imageUrl.trim() ? [{ url: newItem.imageUrl.trim() }] : []
+    if (diff < 0) {
+      const overdueDays = Math.floor(Math.abs(diff) / (1000 * 60 * 60 * 24));
+      const overdueHours = Math.floor((Math.abs(diff) % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      return {
+        isOverdue: true,
+        text: `OVERDUE by ${overdueDays > 0 ? `${overdueDays}d ` : ''}${overdueHours}h!`,
+        days: overdueDays,
+        hours: overdueHours,
+        type: 'overdue'
       };
-
-      await axios.post(`${API_URL}/items`, payload);
-      toast.success('Item listed successfully!');
-      setShowModal(false);
-      setNewItem({
-        title: '',
-        description: '',
-        category: CATEGORIES[0] || 'Electronics',
-        condition: 'Excellent',
-        feePerDay: '',
-        depositAmount: '',
-        area: user?.area || CITIES[0] || 'Indore',
-        imageUrl: ''
-      });
-      fetchData();
-    } catch (err) {
-      console.error(err);
-      toast.error(err.response?.data?.error?.message || 'Failed to list item');
-    } finally {
-      setIsSubmittingItem(false);
     }
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    return {
+      isOverdue: false,
+      text: `${days > 0 ? `${days}d ` : ''}${hours}h remaining`,
+      days,
+      hours,
+      type: 'active'
+    };
   };
 
-  if (!user) return <div className="text-center py-20 text-gray-500 font-medium">Please login to view dashboard.</div>;
+  if (!user) return <div className="text-center py-20 text-gray-400 font-semibold">Please sign in to view your dashboard.</div>;
 
-  const renderRequestCard = (req, isLender) => (
-    <div key={req._id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col sm:flex-row justify-between gap-4">
-      <div>
-        <h3 className="font-bold text-lg text-gray-900">{req.item?.title || 'Item Unavailable'}</h3>
-        <div className="flex items-center gap-2 mt-1 mb-2">
-          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 capitalize">
-            {req.status ? req.status.replace(/_/g, ' ') : 'Requested'}
-          </span>
-        </div>
-        <p className="text-sm text-gray-600">
-          {isLender ? `Borrower: ${req.borrower?.name || 'Community Member'}` : `Owner: ${req.owner?.name || 'Community Member'}`}
-        </p>
-        <p className="text-xs text-gray-400 mt-1">
-          Dates: {new Date(req.startDate).toLocaleDateString()} &mdash; {new Date(req.endDate).toLocaleDateString()}
-        </p>
-      </div>
+  const renderRequestCard = (req, isLender) => {
+    const timeInfo = getTimeRemaining(req.endDate, req.status);
+    const pickupLoc = req.item?.pickupLocation || `${req.item?.area || 'Indore'} (Lender Location)`;
 
-      <div className="flex flex-col sm:items-end justify-between">
-        <p className="font-extrabold text-brand text-xl">₹{req.totalFee}</p>
-        <div className="flex flex-wrap justify-end gap-2 mt-4">
-          {isLender && req.status === 'requested' && (
-            <>
-              <button onClick={() => handleAction(req._id, 'approve')} className="bg-brand text-white px-3.5 py-1.5 rounded-lg text-xs font-bold hover:bg-brand/90 transition shadow-sm">
-                Approve Request
+    return (
+      <div key={req._id} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col gap-5 hover:shadow-md transition">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div className="flex gap-4 items-start">
+            <img 
+              src={req.item?.images?.[0]?.url || 'https://via.placeholder.com/150'} 
+              alt={req.item?.title} 
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover shrink-0 bg-gray-100 border border-gray-100"
+            />
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 capitalize">
+                  {req.status ? req.status.replace(/_/g, ' ') : 'Requested'}
+                </span>
+                <span className="text-xs text-gray-400 font-medium">#{req._id.slice(-6)}</span>
+              </div>
+              <h3 className="font-extrabold text-lg text-gray-900 line-clamp-1">{req.item?.title || 'Item Unavailable'}</h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {isLender 
+                  ? `Borrower: ${req.borrower?.name || 'Community Member'} (${req.borrower?.phone || req.borrower?.area || 'Indore'})` 
+                  : `Lender: ${req.owner?.name || 'Community Member'} (${req.owner?.phone || req.owner?.area || 'Indore'})`}
+              </p>
+            </div>
+          </div>
+
+          <div className="text-left sm:text-right">
+            <p className="text-xs text-gray-400 font-bold uppercase">Total Fee</p>
+            <p className="font-black text-brand text-2xl">₹{req.totalFee}</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">Deposit: ₹{req.depositAmount}</p>
+          </div>
+        </div>
+
+        {/* Real-time Time Left & Pickup Location Banner */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-50">
+          {/* Time Remaining Counter */}
+          <div className={`p-3.5 rounded-2xl flex items-center gap-3 border ${
+            timeInfo?.type === 'overdue' 
+              ? 'bg-red-50 border-red-200 text-red-700' 
+              : (timeInfo?.type === 'completed' 
+                  ? 'bg-gray-50 border-gray-200 text-gray-600' 
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-800')
+          }`}>
+            <Clock className="w-5 h-5 shrink-0" />
+            <div>
+              <p className="text-[10px] font-extrabold uppercase tracking-wider">
+                {isLender ? 'Expected Back In' : 'Time Left to Return'}
+              </p>
+              <p className="text-sm font-black">
+                {timeInfo?.text || 'Pending approval'}
+              </p>
+            </div>
+          </div>
+
+          {/* Pickup & Return Location */}
+          <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/70 text-amber-900 flex items-center gap-3">
+            <Navigation className="w-5 h-5 shrink-0 text-amber-700" />
+            <div className="overflow-hidden">
+              <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">
+                📍 Pickup & Handover Point
+              </p>
+              <p className="text-xs font-bold truncate">
+                {pickupLoc}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-gray-100">
+          <div className="text-xs text-gray-400 font-medium">
+            Rental Period: {new Date(req.startDate).toLocaleDateString()} &rarr; {new Date(req.endDate).toLocaleDateString()}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {isLender && req.status === 'requested' && (
+              <>
+                <button 
+                  onClick={() => handleAction(req._id, 'approve')} 
+                  className="bg-brand text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-brand/90 transition shadow-sm"
+                >
+                  Approve Request
+                </button>
+                <button 
+                  onClick={() => handleAction(req._id, 'decline')} 
+                  className="bg-red-50 text-red-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-100 transition"
+                >
+                  Decline
+                </button>
+              </>
+            )}
+
+            {isLender && req.status === 'approved' && (
+              <button 
+                onClick={() => handleAction(req._id, 'pickup')} 
+                className="bg-brand text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-brand/90 transition shadow-sm flex items-center gap-1.5"
+              >
+                Mark Handed Over to Borrower
               </button>
-              <button onClick={() => handleAction(req._id, 'decline')} className="bg-red-50 text-red-600 px-3.5 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition">
-                Decline
+            )}
+
+            {!isLender && req.status === 'picked_up_pending_borrower_confirmation' && (
+              <button 
+                onClick={() => handleAction(req._id, 'confirm-pickup')} 
+                className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition shadow-sm"
+              >
+                Confirm Received Item
               </button>
-            </>
-          )}
-          {isLender && req.status === 'approved' && (
-            <button onClick={() => handleAction(req._id, 'pickup')} className="bg-brand text-white px-3.5 py-1.5 rounded-lg text-xs font-bold hover:bg-brand/90 transition shadow-sm">
-              Mark Handed Over
-            </button>
-          )}
-          {!isLender && req.status === 'picked_up_pending_borrower_confirmation' && (
-            <button onClick={() => handleAction(req._id, 'confirm-pickup')} className="bg-emerald-600 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition shadow-sm">
-              Confirm Received
-            </button>
-          )}
-          {!isLender && req.status === 'picked_up' && (
-            <button onClick={() => handleAction(req._id, 'return')} className="bg-brand text-white px-3.5 py-1.5 rounded-lg text-xs font-bold hover:bg-brand/90 transition shadow-sm">
-              Mark as Returned
-            </button>
-          )}
-          {isLender && req.status === 'returned_pending_owner_confirmation' && (
-            <button onClick={() => handleAction(req._id, 'confirm-return')} className="bg-emerald-600 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition shadow-sm">
-              Confirm Returned & Complete
-            </button>
-          )}
-          {req.status === 'completed' && (
-            <span className="text-xs text-gray-400 font-semibold py-1">Rental Completed</span>
-          )}
+            )}
+
+            {!isLender && req.status === 'picked_up' && (
+              <button 
+                onClick={() => handleAction(req._id, 'return')} 
+                className="bg-brand text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-brand/90 transition shadow-sm"
+              >
+                Mark Item Returned
+              </button>
+            )}
+
+            {isLender && req.status === 'returned_pending_owner_confirmation' && (
+              <button 
+                onClick={() => handleAction(req._id, 'confirm-return')} 
+                className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition shadow-sm"
+              >
+                Confirm Returned & Complete
+              </button>
+            )}
+
+            {req.status === 'completed' && (
+              <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-3 py-1.5 rounded-xl flex items-center gap-1">
+                <CheckCircle className="w-3.5 h-3.5" /> Handover Complete
+              </span>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
+      {/* Header Profile + Add Button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-extrabold text-gray-900">Welcome, {user.name}</h1>
-          <p className="text-sm text-gray-500 mt-1">{user.area} &bull; Member Dashboard</p>
+          <h1 className="text-3xl font-black text-gray-900">Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Logged in as <strong className="text-gray-900">{user.name}</strong> ({user.area}) &bull; Single unified account
+          </p>
         </div>
         <button 
-          onClick={() => setShowModal(true)} 
-          className="bg-brand text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-brand/90 transition shadow-sm flex items-center gap-2 self-start sm:self-auto"
+          onClick={() => setIsPostModalOpen(true)} 
+          className="bg-brand text-white px-5 py-3 rounded-2xl font-bold text-sm hover:bg-brand/90 transition shadow-lg shadow-brand/20 flex items-center gap-2 self-start sm:self-auto cursor-pointer"
         >
-          <Plus className="w-4 h-4" /> List a New Item
+          <Plus className="w-4 h-4 stroke-[3]" /> Post a Product to Lend
         </button>
       </div>
       
+      {/* Tabs */}
       <div className="flex gap-4 border-b border-gray-200 mb-8 overflow-x-auto">
         <button 
           onClick={() => setActiveTab('borrowing')} 
-          className={`pb-4 px-4 font-bold text-sm whitespace-nowrap flex items-center gap-2 transition ${
+          className={`pb-4 px-4 font-extrabold text-sm whitespace-nowrap flex items-center gap-2 transition cursor-pointer ${
             activeTab === 'borrowing' ? 'text-brand border-b-2 border-brand' : 'text-gray-400 hover:text-gray-600'
           }`}
         >
-          <ShoppingBag className="w-4 h-4"/> My Borrow Requests ({borrowRequests.length})
+          <ShoppingBag className="w-4 h-4"/> Items I Borrowed ({borrowRequests.length})
         </button>
         <button 
           onClick={() => setActiveTab('lending')} 
-          className={`pb-4 px-4 font-bold text-sm whitespace-nowrap flex items-center gap-2 transition ${
+          className={`pb-4 px-4 font-extrabold text-sm whitespace-nowrap flex items-center gap-2 transition cursor-pointer ${
             activeTab === 'lending' ? 'text-brand border-b-2 border-brand' : 'text-gray-400 hover:text-gray-600'
           }`}
         >
-          <Inbox className="w-4 h-4"/> Requests Received ({lenderRequests.length})
+          <Inbox className="w-4 h-4"/> Requests on My Items ({lenderRequests.length})
         </button>
         <button 
           onClick={() => setActiveTab('listings')} 
-          className={`pb-4 px-4 font-bold text-sm whitespace-nowrap flex items-center gap-2 transition ${
+          className={`pb-4 px-4 font-extrabold text-sm whitespace-nowrap flex items-center gap-2 transition cursor-pointer ${
             activeTab === 'listings' ? 'text-brand border-b-2 border-brand' : 'text-gray-400 hover:text-gray-600'
           }`}
         >
-          <Package className="w-4 h-4"/> My Listings ({myItems.length})
+          <Package className="w-4 h-4"/> My Listed Products ({myItems.length})
         </button>
       </div>
 
+      {/* Tab Panels */}
       <div className="min-h-[300px]">
         {activeTab === 'borrowing' && (
           <div className="flex flex-col gap-4">
             {borrowRequests.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 p-8">
-                <p className="text-gray-500 font-medium">You haven't requested any items yet.</p>
+              <div className="text-center py-16 bg-white rounded-3xl border border-gray-100 p-8 shadow-xs">
+                <ShoppingBag className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                <h3 className="font-bold text-gray-800 text-lg">No active borrow requests</h3>
+                <p className="text-gray-400 text-sm mt-1 max-w-sm mx-auto mb-4">
+                  Browse tools, cameras, and gear in your city and borrow with zero hassle.
+                </p>
+                <a href="/explore" className="bg-brand text-white px-5 py-2.5 rounded-xl font-bold text-sm inline-block">
+                  Explore Items Now
+                </a>
               </div>
             ) : (
               borrowRequests.map(req => renderRequestCard(req, false))
@@ -225,8 +296,12 @@ const Dashboard = () => {
         {activeTab === 'lending' && (
           <div className="flex flex-col gap-4">
             {lenderRequests.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 p-8">
-                <p className="text-gray-500 font-medium">No requests received for your items yet.</p>
+              <div className="text-center py-16 bg-white rounded-3xl border border-gray-100 p-8 shadow-xs">
+                <Inbox className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                <h3 className="font-bold text-gray-800 text-lg">No incoming requests yet</h3>
+                <p className="text-gray-400 text-sm mt-1 max-w-sm mx-auto">
+                  When neighbors in Indore, Ujjain, or Dewas request to borrow your items, they will appear here.
+                </p>
               </div>
             ) : (
               lenderRequests.map(req => renderRequestCard(req, true))
@@ -237,26 +312,37 @@ const Dashboard = () => {
         {activeTab === 'listings' && (
           <div>
             {myItems.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 p-8">
-                <p className="text-gray-500 font-medium mb-4">You haven't listed any items yet.</p>
-                <button onClick={() => setShowModal(true)} className="bg-brand text-white px-5 py-2.5 rounded-xl font-bold text-sm">
-                  List Your First Item
+              <div className="text-center py-16 bg-white rounded-3xl border border-gray-100 p-8 shadow-xs">
+                <Package className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                <h3 className="font-bold text-gray-800 text-lg">You haven't listed any items yet</h3>
+                <p className="text-gray-400 text-sm mt-1 max-w-sm mx-auto mb-4">
+                  Have a DSLR, hammer drill, or tent sitting idle? Post it to start earning!
+                </p>
+                <button 
+                  onClick={() => setIsPostModalOpen(true)} 
+                  className="bg-brand text-white px-5 py-2.5 rounded-xl font-bold text-sm"
+                >
+                  + Post Your First Product
                 </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {myItems.map(item => (
-                  <div key={item._id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
-                    <img src={item.images?.[0]?.url || 'https://via.placeholder.com/400x300?text=No+Image'} alt={item.title} className="w-full h-44 object-cover" />
+                  <div key={item._id} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition">
+                    <img 
+                      src={item.images?.[0]?.url || 'https://via.placeholder.com/400x300?text=No+Image'} 
+                      alt={item.title} 
+                      className="w-full h-48 object-cover" 
+                    />
                     <div className="p-5 flex flex-col flex-1">
                       <div className="flex justify-between items-center mb-1.5">
-                        <span className="text-xs font-semibold text-brand">{item.category}</span>
-                        <span className="text-xs text-gray-400">{item.area}</span>
+                        <span className="text-xs font-bold text-brand">{item.category}</span>
+                        <span className="text-xs text-gray-400 font-medium">📍 {item.pickupLocation || item.area}</span>
                       </div>
                       <h3 className="font-bold text-base text-gray-900 line-clamp-1">{item.title}</h3>
                       <div className="mt-auto pt-4 flex justify-between items-center border-t border-gray-50">
-                        <span className="font-extrabold text-brand text-lg">₹{item.feePerDay}/day</span>
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${item.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                        <span className="font-black text-brand text-lg">₹{item.feePerDay}/day</span>
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${item.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
                           {item.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </div>
@@ -269,133 +355,14 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* Modal: List a New Item */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-extrabold text-gray-900">List an Item for Rent</h2>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateItem} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Item Title</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Sony Alpha A7 Camera or Bosch Hammer Drill"
-                  value={newItem.title}
-                  onChange={e => setNewItem({ ...newItem, title: e.target.value })}
-                  className="w-full border border-gray-200 p-3 rounded-xl text-sm outline-none focus:border-brand"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Category</label>
-                  <select 
-                    value={newItem.category}
-                    onChange={e => setNewItem({ ...newItem, category: e.target.value })}
-                    className="w-full border border-gray-200 p-3 rounded-xl text-sm outline-none focus:border-brand bg-white"
-                  >
-                    {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Condition</label>
-                  <select 
-                    value={newItem.condition}
-                    onChange={e => setNewItem({ ...newItem, condition: e.target.value })}
-                    className="w-full border border-gray-200 p-3 rounded-xl text-sm outline-none focus:border-brand bg-white"
-                  >
-                    {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Fee Per Day (₹)</label>
-                  <input 
-                    type="number" 
-                    placeholder="e.g. 150"
-                    value={newItem.feePerDay}
-                    onChange={e => setNewItem({ ...newItem, feePerDay: e.target.value })}
-                    className="w-full border border-gray-200 p-3 rounded-xl text-sm outline-none focus:border-brand"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Security Deposit (₹)</label>
-                  <input 
-                    type="number" 
-                    placeholder="e.g. 1000"
-                    value={newItem.depositAmount}
-                    onChange={e => setNewItem({ ...newItem, depositAmount: e.target.value })}
-                    className="w-full border border-gray-200 p-3 rounded-xl text-sm outline-none focus:border-brand"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">City / Location</label>
-                <select 
-                  value={newItem.area}
-                  onChange={e => setNewItem({ ...newItem, area: e.target.value })}
-                  className="w-full border border-gray-200 p-3 rounded-xl text-sm outline-none focus:border-brand bg-white"
-                >
-                  {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Image URL (Optional)</label>
-                <input 
-                  type="url" 
-                  placeholder="https://images.unsplash.com/photo-..."
-                  value={newItem.imageUrl}
-                  onChange={e => setNewItem({ ...newItem, imageUrl: e.target.value })}
-                  className="w-full border border-gray-200 p-3 rounded-xl text-sm outline-none focus:border-brand"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Description & Details</label>
-                <textarea 
-                  rows={3}
-                  placeholder="Describe your item, accessories included, and pickup notes..."
-                  value={newItem.description}
-                  onChange={e => setNewItem({ ...newItem, description: e.target.value })}
-                  className="w-full border border-gray-200 p-3 rounded-xl text-sm outline-none focus:border-brand resize-none"
-                  required
-                />
-              </div>
-
-              <div className="flex gap-3 pt-3">
-                <button 
-                  type="button" 
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 py-3 rounded-xl font-bold text-sm border border-gray-200 text-gray-700 hover:bg-gray-50 transition"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  disabled={isSubmittingItem}
-                  className="flex-1 py-3 rounded-xl font-bold text-sm bg-brand text-white hover:bg-brand/90 transition shadow-sm disabled:opacity-50"
-                >
-                  {isSubmittingItem ? 'Publishing...' : 'Publish Listing'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Modal for Posting Products */}
+      <PostItemModal 
+        isOpen={isPostModalOpen}
+        onClose={() => setIsPostModalOpen(false)}
+        onItemCreated={() => {
+          fetchData();
+        }}
+      />
     </div>
   );
 };

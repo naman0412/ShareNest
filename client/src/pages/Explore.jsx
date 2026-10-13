@@ -156,10 +156,10 @@ const Explore = () => {
                 </span>
               </div>
               <div className="p-5 flex flex-col flex-1">
-                <div className="flex items-center gap-1 text-xs text-gray-400 font-medium mb-1.5">
-                  <MapPin className="w-3 h-3 text-brand" /> {item.area}
+                <div className="flex items-center gap-1 text-xs text-gray-500 font-semibold mb-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-brand" /> 📍 {item.pickupLocation || `${item.area} (Pickup)`}
                 </div>
-                <h3 className="font-bold text-base text-gray-900 group-hover:text-brand transition mb-2 line-clamp-1">
+                <h3 className="font-extrabold text-base text-gray-900 group-hover:text-brand transition mb-1.5 line-clamp-1">
                   {item.title}
                 </h3>
                 <p className="text-xs text-gray-500 line-clamp-2 mb-4 leading-relaxed">
@@ -167,11 +167,11 @@ const Explore = () => {
                 </p>
                 <div className="flex justify-between items-center mt-auto pt-3 border-t border-gray-50">
                   <div>
-                    <span className="text-xl font-extrabold text-brand">₹{item.feePerDay}</span>
+                    <span className="text-xl font-black text-brand">₹{item.feePerDay}</span>
                     <span className="text-xs font-medium text-gray-400"> / day</span>
                   </div>
-                  <span className="bg-brand/10 text-brand px-3 py-1.5 rounded-lg text-xs font-bold group-hover:bg-brand group-hover:text-white transition">
-                    View & Rent &rarr;
+                  <span className="bg-brand text-white px-3.5 py-1.5 rounded-xl text-xs font-black group-hover:bg-brand/90 transition shadow-sm">
+                    Borrow Now &rarr;
                   </span>
                 </div>
               </div>
