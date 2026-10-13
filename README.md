@@ -1,98 +1,127 @@
 # 🏡 ShareNest — Local Peer-to-Peer Rental & Sharing Platform
 
-> *"Share more. Buy less."*
+<div align="center">
 
-ShareNest is a community-driven web application where neighbors can rent, lend, or borrow everyday items like electronics, tools, cameras, camping gear, and books in their local area (e.g., Indore, Ujjain, Dewas).
+> *"Don't buy what you can borrow. Share more. Spend less. Live sustainably."*
 
-Built with the **MERN Stack** (MongoDB, Express, React, Node.js), Tailwind CSS, Vite, and JWT Authentication.
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-10B981?style=for-the-badge&logo=render&logoColor=white)](https://sharenest-i7zv.onrender.com)
+[![MongoDB Atlas](https://img.shields.io/badge/Database-MongoDB%20Atlas-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/cloud/atlas)
+[![React Vite](https://img.shields.io/badge/Frontend-React%2018%20%2B%20Vite-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://vitejs.dev/)
+[![Node Express](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://expressjs.com/)
 
----
+**[🌐 Visit Live Website: https://sharenest-i7zv.onrender.com](https://sharenest-i7zv.onrender.com)**
 
-## 🚀 Live Deployment Guide (Render + MongoDB Atlas)
-
-### Step 1: Set Up MongoDB Atlas (Cloud Database)
-
-1. Log in to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
-2. Click **Create** to launch a new database:
-   - Select the **M0 Free Tier** (Shared).
-   - Select cloud provider & region (e.g., AWS / Singapore or Mumbai).
-   - Click **Create Deployment**.
-3. **Create Database User**:
-   - Go to **Security** → **Database Access** → **Add New Database User**.
-   - Authentication Method: **Password**.
-   - Username: `sharenest_admin`
-   - Password: `YourStrongPassword123!`
-   - Role: **Atlas Admin** or **Read and write to any database**.
-   - Click **Add User**.
-4. **Whitelist Network Access (IP Whitelist)**:
-   - Go to **Security** → **Network Access** → **Add IP Address**.
-   - Select **Allow Access From Anywhere** (`0.0.0.0/0`) — *essential so Render cloud instances can reach your MongoDB Atlas instance*.
-   - Click **Confirm**.
-5. **Get your Connection String**:
-   - Go to **Database** → click **Connect** next to your cluster.
-   - Choose **Drivers** (Node.js).
-   - Copy your connection string:
-     ```text
-     mongodb+srv://sharenest_admin:<password>@cluster0.xxxxx.mongodb.net/sharenest?retryWrites=true&w=majority
-     ```
-   - Replace `<password>` with your database password and ensure `/sharenest` is the database name.
+</div>
 
 ---
 
-### Step 2: Push Changes to GitHub
+## 💡 The ShareNest Story
 
-In your project terminal:
+Have you ever spent **₹4,000 on an impact drill** just to hang two picture frames? Or **₹60,000 on a DSLR camera** that gathers dust 360 days a year? 
+
+**ShareNest** fixes that. 
+
+ShareNest is a neighborhood sharing marketplace connecting neighbors across **Indore, Ujjain, and Dewas** to rent, borrow, and lend everyday items safely. Borrow a GoPro for your weekend getaway, rent a scientific calculator for your semester exams, or list your unused power tools to earn passive income!
+
+---
+
+## 🔄 How It Works
+
+ShareNest simplifies neighborhood rentals through a transparent, 4-step handover lifecycle:
+
+```mermaid
+flowchart LR
+    A["🔍 1. Explore & Select"] --> B["📅 2. Request Dates"]
+    B --> C["🤝 3. Owner Approves & Handoff"]
+    C --> D["↩️ 4. Return & Done"]
+```
+
+### 🙋 For Borrowers:
+1. **Discover**: Browse categories (Cameras, Electronics, Tools, Books, Camping Gear) or search by your city.
+2. **Book**: Pick your pickup and return dates. See the transparent daily rental rate (e.g. ₹50/day) and refundable deposit.
+3. **Pick Up**: Meet your neighbor, confirm receipt with one tap on your dashboard, and enjoy the item.
+4. **Return**: Return the item on your scheduled date and get your deposit released!
+
+### 📦 For Lenders:
+1. **List in 60 Seconds**: Snap a photo, set your daily fee (₹) and security deposit, and publish your listing.
+2. **Review Requests**: Accept or decline incoming booking requests from verified community members.
+3. **Handover & Earn**: Mark the item as handed over when the borrower arrives.
+4. **Inspect & Complete**: Confirm return upon receiving your item back in original condition.
+
+---
+
+## ✨ Key Features
+
+- 📍 **Hyper-Local Discovery**: Filter items instantly across **Indore**, **Ujjain**, and **Dewas**.
+- ⏱️ **True Rental State Machine**: Enforces secure transitions:
+  `Requested` ➔ `Approved` ➔ `Handed Over` ➔ `Received` ➔ `Returned` ➔ `Completed`.
+- 💰 **Transparent Indian Rupee (₹) Pricing**: Clear daily rental rates and refundable deposits. No hidden platform cuts.
+- 🔐 **Dual Role Auth & Session Management**: Switch between Borrower and Lender roles with JWT authentication and secure passwords.
+- 📱 **Mobile-First Responsive Design**: Clean, modern interface designed with Tailwind CSS and Lucide icons.
+- 🚀 **High-Performance Monorepo Architecture**: Express serves the compiled React Vite SPA in production on a single Render instance with zero CORS issues!
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend** | React 18, Vite, React Router v6, Tailwind CSS, Lucide Icons, React Hot Toast |
+| **Backend** | Node.js, Express, Helmet, CORS, Morgan, Express Rate Limit |
+| **Database** | MongoDB Atlas (Cloud Database with Mongoose ODM) |
+| **Authentication** | JSON Web Tokens (JWT) + Bcrypt password hashing |
+| **Deployment** | Render (Unified Full-Stack Web Service) |
+
+---
+
+## 👥 Instant Test Accounts
+
+You can test the live platform immediately using these credentials:
+
+| Role | Email | Password | City |
+| :--- | :--- | :--- | :--- |
+| **Lender / Owner** | `naman@sharenest.com` | `Password@123` | Indore |
+| **Borrower** | *Click "Sign up for free" to create your own account instantly!* | (Any) | Any |
+
+---
+
+## 💻 Local Development Setup
+
+To run ShareNest locally on your machine:
+
 ```bash
-git add .
-git commit -m "feat: configure ShareNest for Render and MongoDB Atlas deployment"
-git push origin main
+# 1. Clone the repository
+git clone https://github.com/naman0412/ShareNest.git
+cd ShareNest
+
+# 2. Install dependencies for both client and server
+npm run build
+
+# 3. Start local development (runs Express on :5000 and Vite on :5173)
+npm run dev
 ```
 
----
-
-### Step 3: Deploy on Render
-
-ShareNest is configured with single-service monorepo deployment (Express serves both the API and the React production build on the same domain, with zero CORS issues).
-
-1. Log in to [dashboard.render.com](https://dashboard.render.com).
-2. Click **New +** → **Web Service**.
-3. Connect your GitHub repository: `https://github.com/naman0412/ShareNest`.
-4. Configure the service:
-   - **Name**: `sharenest`
-   - **Region**: Singapore (or Oregon)
-   - **Branch**: `main`
-   - **Root Directory**: *(Leave blank)*
-   - **Runtime**: `Node`
-   - **Build Command**:
-     ```bash
-     npm run build
-     ```
-   - **Start Command**:
-     ```bash
-     npm start
-     ```
-   - **Plan**: `Free`
-5. Under **Environment Variables**, add:
-   - `NODE_ENV`: `production`
-   - `MONGODB_URI`: *Your MongoDB Atlas connection URI from Step 1*
-   - `JWT_SECRET`: *Any secure random 32-character string*
-6. Click **Deploy Web Service**!
+- Frontend URL: `http://localhost:5173`
+- Backend API: `http://localhost:5000/api`
+- Health check: `http://localhost:5000/api/health`
 
 ---
 
-### Step 4: Seed Database with Sample Items
+## 🌍 Cloud Deployment (Render + MongoDB Atlas)
 
-Once your MongoDB Atlas cluster is running, populate it with 10 users and 25 items by running:
+ShareNest is pre-configured with a Render blueprint (`render.yaml`).
 
-```powershell
-cd server
-$env:MONGODB_URI="mongodb+srv://sharenest_admin:<password>@cluster0.xxxxx.mongodb.net/sharenest?retryWrites=true&w=majority"
-npm run seed
-```
+1. **Database**: Create a free **M0 cluster** on [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) and allow access from `0.0.0.0/0`.
+2. **Render Web Service**:
+   - Build Command: `npm run build`
+   - Start Command: `npm start`
+   - Environment Variables:
+     - `NODE_ENV`: `production`
+     - `MONGODB_URI`: `mongodb+srv://<username>:<password>@cluster0.xxx.mongodb.net/sharenest?retryWrites=true&w=majority`
+     - `JWT_SECRET`: `your_random_secret_key`
 
 ---
 
-## 👥 Seed Accounts
-
-- **Email**: `user1@example.com` ... `user10@example.com`
-- **Password**: `password123`
+<div align="center">
+  <sub>Built with ❤️ for sustainable community sharing.</sub>
+</div>

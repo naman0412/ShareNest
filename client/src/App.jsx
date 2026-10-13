@@ -6,7 +6,7 @@ import Layout from './components/Layout';
 import Home from './pages/Home';
 import Explore from './pages/Explore';
 import Login from './pages/Login';
-// import ItemDetail from './pages/ItemDetail';
+import ItemDetail from './pages/ItemDetail';
 import Dashboard from './pages/Dashboard';
 
 function App() {
@@ -18,6 +18,8 @@ function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<Home />} />
             <Route path="explore" element={<Explore />} />
+            <Route path="items/:id" element={<ItemDetail />} />
+            <Route path="item/:id" element={<ItemDetail />} />
             <Route path="login" element={<Login />} />
             <Route path="dashboard" element={<Dashboard />} />
           </Route>
