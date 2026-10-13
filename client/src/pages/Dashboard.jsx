@@ -1,18 +1,28 @@
 import React, { useContext, useEffect, useState } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { API_URL, CITIES, CATEGORIES } from '../constants';
 import axios from 'axios';
-import { Package, Inbox, ShoppingBag, Plus, Clock, MapPin, AlertCircle, CheckCircle, Navigation, Shield, ArrowRight } from 'lucide-react';
+import { Package, Inbox, ShoppingBag, Plus, Clock, MapPin, AlertCircle, CheckCircle, Navigation, Shield, ArrowRight, Phone, MessageSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PostItemModal from '../components/PostItemModal';
 
 const Dashboard = () => {
   const { user } = useContext(AuthContext);
-  const [activeTab, setActiveTab] = useState('borrowing');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'borrowing';
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [borrowRequests, setBorrowRequests] = useState([]);
   const [lenderRequests, setLenderRequests] = useState([]);
   const [myItems, setMyItems] = useState([]);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['borrowing', 'lending', 'listings'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (user) {
@@ -35,10 +45,21 @@ const Dashboard = () => {
     }
   };
 
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
+
   const handleAction = async (reqId, action) => {
     try {
       await axios.patch(`${API_URL}/requests/${reqId}/${action}`);
-      toast.success('Status updated successfully');
+      if (action === 'approve') toast.success('🎉 Borrow request approved! Borrower has been notified.');
+      else if (action === 'decline') toast.success('Borrow request declined.');
+      else if (action === 'pickup') toast.success('📦 Marked as handed over to borrower.');
+      else if (action === 'confirm-pickup') toast.success('✅ Pickup confirmed! Enjoy your rental.');
+      else if (action === 'return') toast.success('🔄 Marked item as returned.');
+      else if (action === 'confirm-return') toast.success('🎉 Return confirmed! Rental completed.');
+      else toast.success('Status updated successfully');
       fetchData();
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'Failed to update request');
@@ -84,6 +105,69 @@ const Dashboard = () => {
 
   if (!user) return <div className="text-center py-20 text-gray-400 font-semibold">Please sign in to view your dashboard.</div>;
 
+  const getStatusBadge = (status, isLender) => {
+    switch (status) {
+      case 'requested':
+        return isLender ? (
+          <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1.5 animate-pulse">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-700" /> Action Required: Approve Request
+          </span>
+        ) : (
+          <span className="px-3 py-1 rounded-full text-xs font-black bg-blue-50 text-blue-800 border border-blue-200 flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-blue-600" /> Applied &bull; Waiting for Owner Approval
+          </span>
+        );
+      case 'approved':
+        return (
+          <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1.5">
+            <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> {isLender ? 'Approved &bull; Ready for Handover' : 'Approved! Ready for Pickup'}
+          </span>
+        );
+      case 'picked_up_pending_borrower_confirmation':
+        return (
+          <span className="px-3 py-1 rounded-full text-xs font-black bg-indigo-50 text-indigo-800 border border-indigo-200 flex items-center gap-1.5">
+            <Package className="w-3.5 h-3.5 text-indigo-600" /> {isLender ? 'Handed Over &bull; Awaiting Confirmation' : 'Lender Handed Over &bull; Please Confirm'}
+          </span>
+        );
+      case 'picked_up':
+        return (
+          <span className="px-3 py-1 rounded-full text-xs font-black bg-purple-50 text-purple-800 border border-purple-200 flex items-center gap-1.5">
+            <Package className="w-3.5 h-3.5 text-purple-600" /> {isLender ? 'Active Rental &bull; With Borrower' : 'Active Rental &bull; In Your Possession'}
+          </span>
+        );
+      case 'returned_pending_owner_confirmation':
+        return (
+          <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1.5 animate-pulse">
+            <Clock className="w-3.5 h-3.5 text-amber-700" /> {isLender ? 'Item Returned &bull; Please Confirm Return' : 'Returned &bull; Waiting Confirmation'}
+          </span>
+        );
+      case 'completed':
+        return (
+          <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1.5">
+            <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Completed
+          </span>
+        );
+      case 'declined':
+        return (
+          <span className="px-3 py-1 rounded-full text-xs font-black bg-red-50 text-red-700 border border-red-200">
+            Declined
+          </span>
+        );
+      case 'cancelled':
+        return (
+          <span className="px-3 py-1 rounded-full text-xs font-black bg-gray-100 text-gray-700 border border-gray-200">
+            Cancelled
+          </span>
+        );
+      default:
+        return (
+          <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 capitalize">
+            {status}
+          </span>
+        );
+    }
+  };
+
   const renderRequestCard = (req, isLender) => {
     const timeInfo = getTimeRemaining(req.endDate, req.status);
     const pickupLoc = req.item?.pickupLocation || `${req.item?.area || 'Indore'} (Lender Location)`;
@@ -98,10 +182,8 @@ const Dashboard = () => {
               className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover shrink-0 bg-gray-100 border border-gray-100"
             />
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 capitalize">
-                  {req.status ? req.status.replace(/_/g, ' ') : 'Requested'}
-                </span>
+              <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                {getStatusBadge(req.status, isLender)}
                 <span className="text-xs text-gray-400 font-medium">#{req._id.slice(-6)}</span>
               </div>
               <h3 className="font-extrabold text-lg text-gray-900 line-clamp-1">{req.item?.title || 'Item Unavailable'}</h3>
@@ -119,6 +201,16 @@ const Dashboard = () => {
             <p className="text-[11px] text-gray-400 mt-0.5">Deposit: ₹{req.depositAmount}</p>
           </div>
         </div>
+
+        {/* Borrower Note if available */}
+        {req.borrowerNote && (
+          <div className="bg-gray-50/90 rounded-2xl p-3 border border-gray-100 text-xs text-gray-700 flex items-start gap-2">
+            <MessageSquare className="w-4 h-4 text-brand shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold text-gray-900">Borrower's Note:</span> &ldquo;{req.borrowerNote}&rdquo;
+            </div>
+          </div>
+        )}
 
         {/* Real-time Time Left & Pickup Location Banner */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-50">
@@ -166,13 +258,13 @@ const Dashboard = () => {
               <>
                 <button 
                   onClick={() => handleAction(req._id, 'approve')} 
-                  className="bg-brand text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-brand/90 transition shadow-sm"
+                  className="bg-brand text-white px-4 py-2.5 rounded-xl text-xs font-black hover:bg-brand/90 transition shadow-md shadow-brand/20 active:scale-95 cursor-pointer"
                 >
-                  Approve Request
+                  ✓ Approve Request
                 </button>
                 <button 
                   onClick={() => handleAction(req._id, 'decline')} 
-                  className="bg-red-50 text-red-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-100 transition"
+                  className="bg-red-50 text-red-600 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-red-100 transition active:scale-95 cursor-pointer"
                 >
                   Decline
                 </button>
@@ -182,7 +274,7 @@ const Dashboard = () => {
             {isLender && req.status === 'approved' && (
               <button 
                 onClick={() => handleAction(req._id, 'pickup')} 
-                className="bg-brand text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-brand/90 transition shadow-sm flex items-center gap-1.5"
+                className="bg-brand text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-brand/90 transition shadow-sm flex items-center gap-1.5 cursor-pointer"
               >
                 Mark Handed Over to Borrower
               </button>
@@ -191,7 +283,7 @@ const Dashboard = () => {
             {!isLender && req.status === 'picked_up_pending_borrower_confirmation' && (
               <button 
                 onClick={() => handleAction(req._id, 'confirm-pickup')} 
-                className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition shadow-sm"
+                className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-emerald-700 transition shadow-sm cursor-pointer"
               >
                 Confirm Received Item
               </button>
@@ -200,7 +292,7 @@ const Dashboard = () => {
             {!isLender && req.status === 'picked_up' && (
               <button 
                 onClick={() => handleAction(req._id, 'return')} 
-                className="bg-brand text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-brand/90 transition shadow-sm"
+                className="bg-brand text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-brand/90 transition shadow-sm cursor-pointer"
               >
                 Mark Item Returned
               </button>
@@ -209,7 +301,7 @@ const Dashboard = () => {
             {isLender && req.status === 'returned_pending_owner_confirmation' && (
               <button 
                 onClick={() => handleAction(req._id, 'confirm-return')} 
-                className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition shadow-sm"
+                className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-emerald-700 transition shadow-sm cursor-pointer"
               >
                 Confirm Returned & Complete
               </button>
@@ -225,6 +317,8 @@ const Dashboard = () => {
       </div>
     );
   };
+
+  const pendingLenderCount = lenderRequests.filter(r => r.status === 'requested').length;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -247,7 +341,7 @@ const Dashboard = () => {
       {/* Tabs */}
       <div className="flex gap-4 border-b border-gray-200 mb-8 overflow-x-auto">
         <button 
-          onClick={() => setActiveTab('borrowing')} 
+          onClick={() => handleTabChange('borrowing')} 
           className={`pb-4 px-4 font-extrabold text-sm whitespace-nowrap flex items-center gap-2 transition cursor-pointer ${
             activeTab === 'borrowing' ? 'text-brand border-b-2 border-brand' : 'text-gray-400 hover:text-gray-600'
           }`}
@@ -255,15 +349,20 @@ const Dashboard = () => {
           <ShoppingBag className="w-4 h-4"/> Items I Borrowed ({borrowRequests.length})
         </button>
         <button 
-          onClick={() => setActiveTab('lending')} 
-          className={`pb-4 px-4 font-extrabold text-sm whitespace-nowrap flex items-center gap-2 transition cursor-pointer ${
+          onClick={() => handleTabChange('lending')} 
+          className={`pb-4 px-4 font-extrabold text-sm whitespace-nowrap flex items-center gap-2 transition cursor-pointer relative ${
             activeTab === 'lending' ? 'text-brand border-b-2 border-brand' : 'text-gray-400 hover:text-gray-600'
           }`}
         >
           <Inbox className="w-4 h-4"/> Requests on My Items ({lenderRequests.length})
+          {pendingLenderCount > 0 && (
+            <span className="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs animate-pulse">
+              {pendingLenderCount} new
+            </span>
+          )}
         </button>
         <button 
-          onClick={() => setActiveTab('listings')} 
+          onClick={() => handleTabChange('listings')} 
           className={`pb-4 px-4 font-extrabold text-sm whitespace-nowrap flex items-center gap-2 transition cursor-pointer ${
             activeTab === 'listings' ? 'text-brand border-b-2 border-brand' : 'text-gray-400 hover:text-gray-600'
           }`}

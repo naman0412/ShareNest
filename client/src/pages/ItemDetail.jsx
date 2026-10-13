@@ -67,14 +67,15 @@ const ItemDetail = () => {
     setIsSubmitting(true);
     try {
       await axios.post(`${API_URL}/requests`, {
+        item: item._id,
         itemId: item._id,
         startDate: new Date(startDate).toISOString(),
         endDate: new Date(endDate).toISOString(),
         borrowerNote
       });
 
-      toast.success('🎉 Borrow request sent to lender! Check your Dashboard to track progress.');
-      navigate('/dashboard');
+      toast.success('🎉 Borrow request applied! Sent to lender for approval.', { duration: 4000 });
+      navigate('/dashboard?tab=borrowing');
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.error?.message || 'Failed to submit borrow request');
